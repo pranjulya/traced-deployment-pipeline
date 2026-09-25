@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "fixtures_version": "P09-fixtures-0.1.0",
+  "price_version": "prices-2026-01-01",
+  "default_currency": "USD",
+  "note": "All money is exact decimal strings, never floats. Unknown prices/usage must stay unknown, never zero.",
+  "models": [
+    {
+      "alias": "fake-small",
+      "currency": "USD",
+      "effective_from": "2026-01-01",
+      "input_per_million": "0.15",
+      "output_per_million": "0.60"
+    },
+    {
+      "alias": "fake-large",
+      "currency": "USD",
+      "effective_from": "2026-01-01",
+      "input_per_million": "3.00",
+      "output_per_million": "15.00"
+    },
+    {
+      "alias": "local-fake",
+      "currency": "USD",
+      "effective_from": "2026-01-01",
+      "input_per_million": "0.00",
+      "output_per_million": "0.00",
+      "api_fee_is_zero": true
+    },
+    {
+      "alias": "fake-eur",
+      "currency": "EUR",
+      "effective_from": "2026-01-01",
+      "input_per_million": "0.20",
+      "output_per_million": "0.80"
+    }
+  ]
+}

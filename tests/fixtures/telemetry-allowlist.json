@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "fixtures_version": "P09-fixtures-0.1.0",
+  "note": "Frozen telemetry schema (ADR 003). Allowlist only: nothing outside these lists may be emitted.",
+  "spans": {
+    "agent.run": {
+      "attributes": ["operation", "status", "error_class", "deployment_revision"]
+    },
+    "provider.attempt": {
+      "attributes": ["provider_alias", "model_alias", "attempt_ordinal", "status", "error_class", "input_tokens", "output_tokens"]
+    },
+    "tool.lookup": {
+      "attributes": ["tool_alias", "status", "error_class"]
+    }
+  },
+  "metric_labels": ["route_template", "operation", "outcome", "model_alias"],
+  "forbidden_attributes": [
+    "prompt", "output", "tool_arguments", "authorization", "cookie",
+    "idempotency_key", "run_id", "trace_id", "span_id",
+    "exception.message", "exception.stacktrace", "user_id", "email", "api_key", "db_dsn"
+  ],
+  "forbidden_metric_labels": ["run_id", "trace_id", "principal", "currency", "raw_error"],
+  "sampling": {
+    "default_head_rate": 1.0,
+    "experiment_head_rate": 0.1,
+    "tail_sampling": false,
+    "metrics_sampled": false,
+    "accounting_sampled": false
+  }
+}

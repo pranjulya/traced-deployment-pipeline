@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "fixtures_version": "P09-fixtures-0.1.0",
+  "note": "Synthetic sensitive values. They MUST NOT appear in SDK output, Collector, Tempo, metric labels, application logs, notifications or evidence exports.",
+  "canaries": [
+    {"id": "pii-email", "value": "canary.pii@example.invalid", "represents": "user identifier"},
+    {"id": "secret-api-key", "value": "CANARY_SECRET_sk_live_000000000000", "represents": "api secret"},
+    {"id": "prompt-text", "value": "CANARY_PROMPT_export_all_customer_rows", "represents": "prompt content"},
+    {"id": "tool-args", "value": "CANARY_TOOLARG_table=customers&limit=all", "represents": "tool arguments"},
+    {"id": "header", "value": "CANARY_HEADER_x-forwarded-user-42", "represents": "header value"},
+    {"id": "exception", "value": "CANARY_EXCEPTION_connection_reset_at_10.0.0.1", "represents": "raw exception text"},
+    {"id": "db-dsn", "value": "CANARY_DSN_sqlite:///./canary-secret.db", "represents": "credential / DSN"}
+  ]
+}

@@ -1,0 +1,446 @@
+{
+  "schema_version": 1,
+  "fixtures_version": "P09-fixtures-0.1.0",
+  "note": "Deterministic oracle. Expected values are specified before implementation (Phase 00) and are the review subject for G1. No result may be marked passing without recorded output.",
+  "cases": [
+    {
+      "id": "success-single-attempt",
+      "phase": "01",
+      "requirement": ["R01", "R03", "R04"],
+      "description": "One authenticated run, one provider attempt and one read-only tool call succeed.",
+      "expected": {
+        "http_status": 200,
+        "safe_error_code": null,
+        "answer_released": true,
+        "provider_calls": 1,
+        "tool_calls": 1,
+        "run_state": "completed",
+        "unknown_attempts": 0,
+        "attempts": [
+          {"ordinal": 1, "model": "fake-small", "currency": "USD", "status": "completed", "usage_origin": "provider", "input_tokens": 1000, "output_tokens": 500, "charge_state": "observed", "charge": "0.000450"}
+        ],
+        "ledger_charge_total": {"USD": "0.000450"},
+        "spans": [
+          {"name": "agent.run", "parent": null},
+          {"name": "provider.attempt", "parent": "agent.run"},
+          {"name": "tool.lookup", "parent": "agent.run"}
+        ]
+      }
+    },
+    {
+      "id": "missing-idempotency-key",
+      "phase": "01",
+      "requirement": ["R01"],
+      "description": "Request without an Idempotency-Key is rejected before any dispatch.",
+      "expected": {
+        "http_status": 400,
+        "safe_error_code": "MISSING_IDEMPOTENCY_KEY",
+        "answer_released": false,
+        "provider_calls": 0,
+        "tool_calls": 0,
+        "run_state": null,
+        "unknown_attempts": 0,
+        "attempts": [],
+        "ledger_charge_total": {}
+      }
+    },
+    {
+      "id": "bad-credential",
+      "phase": "01",
+      "requirement": ["R01"],
+      "description": "Invalid application credential returns 401 with zero registry execution and zero provider calls.",
+      "expected": {
+        "http_status": 401,
+        "safe_error_code": "UNAUTHENTICATED",
+        "answer_released": false,
+        "provider_calls": 0,
+        "tool_calls": 0,
+        "run_state": null,
+        "unknown_attempts": 0,
+        "attempts": [],
+        "ledger_charge_total": {}
+      }
+    },
+    {
+      "id": "oversized-body",
+      "phase": "01",
+      "requirement": ["R01"],
+      "description": "Body larger than the 8 KiB bound is rejected before provider calls.",
+      "expected": {
+        "http_status": 400,
+        "safe_error_code": "PAYLOAD_TOO_LARGE",
+        "answer_released": false,
+        "provider_calls": 0,
+        "tool_calls": 0,
+        "run_state": null,
+        "unknown_attempts": 0,
+        "attempts": [],
+        "ledger_charge_total": {}
+      }
+    },
+    {
+      "id": "duplicate-same-key",
+      "phase": "01",
+      "requirement": ["R04"],
+      "description": "Two concurrent requests with the same principal/key: only the admission winner dispatches; duplicate gets 409 metadata.",
+      "expected": {
+        "http_status": 409,
+        "safe_error_code": "DUPLICATE_REQUEST",
+        "answer_released": false,
+        "provider_calls": 1,
+        "tool_calls": 1,
+        "run_state": "completed",
+        "unknown_attempts": 0,
+        "attempts": [
+          {"ordinal": 1, "model": "fake-small", "currency": "USD", "status": "completed", "usage_origin": "provider", "input_tokens": 1000, "output_tokens": 500, "charge_state": "observed", "charge": "0.000450"}
+        ],
+        "ledger_charge_total": {"USD": "0.000450"}
+      }
+    },
+    {
+      "id": "duplicate-different-body",
+      "phase": "01",
+      "requirement": ["R04"],
+      "description": "Same key with a different valid body is ignored: 409, no second provider call, body content not retained.",
+      "expected": {
+        "http_status": 409,
+        "safe_error_code": "DUPLICATE_REQUEST",
+        "answer_released": false,
+        "provider_calls": 1,
+        "tool_calls": 1,
+        "run_state": "completed",
+        "unknown_attempts": 0,
+        "attempts": [
+          {"ordinal": 1, "model": "fake-small", "currency": "USD", "status": "completed", "usage_origin": "provider", "input_tokens": 1000, "output_tokens": 500, "charge_state": "observed", "charge": "0.000450"}
+        ],
+        "ledger_charge_total": {"USD": "0.000450"}
+      }
+    },
+    {
+      "id": "provider-retry-success",
+      "phase": "01",
+      "requirement": ["R01", "R04"],
+      "description": "Transient provider fault then success: each actual attempt counted once within the 30 s deadline.",
+      "expected": {
+        "http_status": 200,
+        "safe_error_code": null,
+        "answer_released": true,
+        "provider_calls": 2,
+        "tool_calls": 1,
+        "run_state": "completed",
+        "unknown_attempts": 0,
+        "attempts": [
+          {"ordinal": 1, "model": "fake-small", "currency": "USD", "status": "failed", "usage_origin": "provider", "input_tokens": null, "output_tokens": null, "charge_state": "observed", "charge": "0.000000"},
+          {"ordinal": 2, "model": "fake-small", "currency": "USD", "status": "completed", "usage_origin": "provider", "input_tokens": 1000, "output_tokens": 400, "charge_state": "observed", "charge": "0.000390"}
+        ],
+        "ledger_charge_total": {"USD": "0.000390"},
+        "spans": [
+          {"name": "agent.run", "parent": null},
+          {"name": "provider.attempt", "parent": "agent.run"},
+          {"name": "provider.attempt", "parent": "agent.run"},
+          {"name": "tool.lookup", "parent": "agent.run"}
+        ]
+      }
+    },
+    {
+      "id": "provider-retry-exhausted",
+      "phase": "01",
+      "requirement": ["R01", "R04"],
+      "description": "Provider keeps failing; attempts stop at the maximum of three and the run fails.",
+      "expected": {
+        "http_status": 502,
+        "safe_error_code": "PROVIDER_UNAVAILABLE",
+        "answer_released": false,
+        "provider_calls": 3,
+        "tool_calls": 0,
+        "run_state": "failed",
+        "unknown_attempts": 0,
+        "attempts": [
+          {"ordinal": 1, "model": "fake-small", "currency": "USD", "status": "failed", "usage_origin": "provider", "input_tokens": null, "output_tokens": null, "charge_state": "observed", "charge": "0.000000"},
+          {"ordinal": 2, "model": "fake-small", "currency": "USD", "status": "failed", "usage_origin": "provider", "input_tokens": null, "output_tokens": null, "charge_state": "observed", "charge": "0.000000"},
+          {"ordinal": 3, "model": "fake-small", "currency": "USD", "status": "failed", "usage_origin": "provider", "input_tokens": null, "output_tokens": null, "charge_state": "observed", "charge": "0.000000"}
+        ],
+        "ledger_charge_total": {"USD": "0.000000"}
+      }
+    },
+    {
+      "id": "provider-timeout-unknown",
+      "phase": "01",
+      "requirement": ["R04"],
+      "description": "Provider times out after dispatch; the charge is unknown and must never be recorded as zero.",
+      "expected": {
+        "http_status": 504,
+        "safe_error_code": "PROVIDER_TIMEOUT",
+        "answer_released": false,
+        "provider_calls": 1,
+        "tool_calls": 0,
+        "run_state": "failed",
+        "unknown_attempts": 1,
+        "attempts": [
+          {"ordinal": 1, "model": "fake-small", "currency": "USD", "status": "unknown", "usage_origin": "unknown", "input_tokens": null, "output_tokens": null, "charge_state": "unknown", "charge": null}
+        ],
+        "ledger_charge_total": {}
+      }
+    },
+    {
+      "id": "missing-usage",
+      "phase": "01",
+      "requirement": ["R04"],
+      "description": "Provider returns no token counts; the answer may be released but the charge stays unknown.",
+      "expected": {
+        "http_status": 200,
+        "safe_error_code": null,
+        "answer_released": true,
+        "provider_calls": 1,
+        "tool_calls": 1,
+        "run_state": "completed",
+        "unknown_attempts": 1,
+        "attempts": [
+          {"ordinal": 1, "model": "fake-small", "currency": "USD", "status": "completed", "usage_origin": "unknown", "input_tokens": null, "output_tokens": null, "charge_state": "unknown", "charge": null}
+        ],
+        "ledger_charge_total": {}
+      }
+    },
+    {
+      "id": "price-lookup-miss",
+      "phase": "01",
+      "requirement": ["R04"],
+      "description": "Tokens are known but no price applies; charge is unknown, never zero.",
+      "expected": {
+        "http_status": 200,
+        "safe_error_code": null,
+        "answer_released": true,
+        "provider_calls": 1,
+        "tool_calls": 1,
+        "run_state": "completed",
+        "unknown_attempts": 1,
+        "attempts": [
+          {"ordinal": 1, "model": "fake-small", "currency": "USD", "status": "completed", "usage_origin": "provider", "input_tokens": 1000, "output_tokens": 500, "charge_state": "unknown", "charge": null}
+        ],
+        "ledger_charge_total": {}
+      }
+    },
+    {
+      "id": "ledger-commit-fail-before-dispatch",
+      "phase": "01",
+      "requirement": ["R04"],
+      "description": "Pending attempt cannot be committed; no external call is made and 503 is returned.",
+      "expected": {
+        "http_status": 503,
+        "safe_error_code": "ACCOUNTING_UNAVAILABLE",
+        "answer_released": false,
+        "provider_calls": 0,
+        "tool_calls": 0,
+        "run_state": null,
+        "unknown_attempts": 0,
+        "attempts": [],
+        "ledger_charge_total": {}
+      }
+    },
+    {
+      "id": "ledger-commit-fail-after-provider",
+      "phase": "01",
+      "requirement": ["R04"],
+      "description": "Provider returned but completion commit failed: answer withheld, 503 with run_id, uncertainty retained, duplicate stays blocked.",
+      "expected": {
+        "http_status": 503,
+        "safe_error_code": "ACCOUNTING_UNAVAILABLE",
+        "answer_released": false,
+        "provider_calls": 1,
+        "tool_calls": 1,
+        "run_state": "accounting_unknown",
+        "unknown_attempts": 1,
+        "attempts": [
+          {"ordinal": 1, "model": "fake-small", "currency": "USD", "status": "unknown", "usage_origin": "unknown", "input_tokens": null, "output_tokens": null, "charge_state": "unknown", "charge": null}
+        ],
+        "ledger_charge_total": {}
+      }
+    },
+    {
+      "id": "crash-before-dispatch",
+      "phase": "01",
+      "requirement": ["R04"],
+      "description": "Crash after admission, before dispatch; startup conservatively marks the run accounting_unknown and does not replay it.",
+      "expected": {
+        "http_status": null,
+        "safe_error_code": null,
+        "answer_released": false,
+        "provider_calls": 0,
+        "tool_calls": 0,
+        "run_state": "accounting_unknown",
+        "unknown_attempts": 0,
+        "attempts": [],
+        "ledger_charge_total": {}
+      }
+    },
+    {
+      "id": "crash-after-dispatch",
+      "phase": "01",
+      "requirement": ["R04"],
+      "description": "Crash after external dispatch; the unresolved attempt becomes unknown and is never auto-redispatched.",
+      "expected": {
+        "http_status": null,
+        "safe_error_code": null,
+        "answer_released": false,
+        "provider_calls": 1,
+        "tool_calls": 0,
+        "run_state": "accounting_unknown",
+        "unknown_attempts": 1,
+        "attempts": [
+          {"ordinal": 1, "model": "fake-small", "currency": "USD", "status": "unknown", "usage_origin": "unknown", "input_tokens": null, "output_tokens": null, "charge_state": "unknown", "charge": null}
+        ],
+        "ledger_charge_total": {}
+      }
+    },
+    {
+      "id": "currency-eur-separate",
+      "phase": "01",
+      "requirement": ["R04"],
+      "description": "A EUR-priced model produces only a EUR total; currencies are never summed together.",
+      "expected": {
+        "http_status": 200,
+        "safe_error_code": null,
+        "answer_released": true,
+        "provider_calls": 1,
+        "tool_calls": 1,
+        "run_state": "completed",
+        "unknown_attempts": 0,
+        "attempts": [
+          {"ordinal": 1, "model": "fake-eur", "currency": "EUR", "status": "completed", "usage_origin": "provider", "input_tokens": 1000, "output_tokens": 500, "charge_state": "observed", "charge": "0.000600"}
+        ],
+        "ledger_charge_total": {"EUR": "0.000600"}
+      }
+    },
+    {
+      "id": "zero-fee-local-provider",
+      "phase": "01",
+      "requirement": ["R04"],
+      "description": "Local fake provider has zero API fee; host compute/electricity are tracked separately and never silently zeroed.",
+      "expected": {
+        "http_status": 200,
+        "safe_error_code": null,
+        "answer_released": true,
+        "provider_calls": 1,
+        "tool_calls": 1,
+        "run_state": "completed",
+        "unknown_attempts": 0,
+        "attempts": [
+          {"ordinal": 1, "model": "local-fake", "currency": "USD", "status": "completed", "usage_origin": "provider", "input_tokens": 1000, "output_tokens": 500, "charge_state": "observed", "charge": "0.000000"}
+        ],
+        "ledger_charge_total": {"USD": "0.000000"},
+        "non_api_cost": {"state": "not_measured", "note": "host compute/electricity are estimated separately and never silently zeroed"}
+      }
+    },
+    {
+      "id": "canary-privacy-success",
+      "phase": "03",
+      "requirement": ["R03", "R07"],
+      "description": "Synthetic canaries placed in prompt, tool args, header and exception appear in zero telemetry sinks.",
+      "canaries_injected": ["pii-email", "secret-api-key", "prompt-text", "tool-args", "header", "exception"],
+      "expected": {
+        "http_status": 200,
+        "safe_error_code": null,
+        "answer_released": true,
+        "provider_calls": 1,
+        "tool_calls": 1,
+        "run_state": "completed",
+        "unknown_attempts": 0,
+        "attempts": [
+          {"ordinal": 1, "model": "fake-small", "currency": "USD", "status": "completed", "usage_origin": "provider", "input_tokens": 1000, "output_tokens": 500, "charge_state": "observed", "charge": "0.000450"}
+        ],
+        "ledger_charge_total": {"USD": "0.000450"},
+        "spans": [
+          {"name": "agent.run", "parent": null},
+          {"name": "provider.attempt", "parent": "agent.run"},
+          {"name": "tool.lookup", "parent": "agent.run"}
+        ],
+        "canary_hits": 0
+      }
+    },
+    {
+      "id": "exporter-outage",
+      "phase": "03",
+      "requirement": ["R07"],
+      "description": "Telemetry export endpoint is down: request still succeeds, drops are counted, ledger totals are unchanged.",
+      "expected": {
+        "http_status": 200,
+        "safe_error_code": null,
+        "answer_released": true,
+        "provider_calls": 1,
+        "tool_calls": 1,
+        "run_state": "completed",
+        "unknown_attempts": 0,
+        "attempts": [
+          {"ordinal": 1, "model": "fake-small", "currency": "USD", "status": "completed", "usage_origin": "provider", "input_tokens": 1000, "output_tokens": 500, "charge_state": "observed", "charge": "0.000450"}
+        ],
+        "ledger_charge_total": {"USD": "0.000450"},
+        "telemetry_drops": 5,
+        "canary_hits": 0
+      }
+    },
+    {
+      "id": "head-sampling-gap",
+      "phase": "03",
+      "requirement": ["R03"],
+      "description": "10% head sampling may drop this run's trace; no promise of retaining every error and ledger totals stay unchanged.",
+      "expected": {
+        "http_status": 200,
+        "safe_error_code": null,
+        "answer_released": true,
+        "provider_calls": 1,
+        "tool_calls": 1,
+        "run_state": "completed",
+        "unknown_attempts": 0,
+        "attempts": [
+          {"ordinal": 1, "model": "fake-small", "currency": "USD", "status": "completed", "usage_origin": "provider", "input_tokens": 1000, "output_tokens": 500, "charge_state": "observed", "charge": "0.000450"}
+        ],
+        "ledger_charge_total": {"USD": "0.000450"},
+        "sampling_head_rate": 0.1,
+        "trace_retained": false,
+        "spans": []
+      }
+    },
+    {
+      "id": "low-traffic-no-alert",
+      "phase": "04",
+      "requirement": ["R06"],
+      "description": "A handful of successful requests must not page: thresholds require minimum traffic and a sustained window.",
+      "expected": {
+        "http_status": 200,
+        "safe_error_code": null,
+        "answer_released": true,
+        "provider_calls": 1,
+        "tool_calls": 1,
+        "run_state": "completed",
+        "unknown_attempts": 0,
+        "attempts": [
+          {"ordinal": 1, "model": "fake-small", "currency": "USD", "status": "completed", "usage_origin": "provider", "input_tokens": 1000, "output_tokens": 500, "charge_state": "observed", "charge": "0.000450"}
+        ],
+        "ledger_charge_total": {"USD": "0.000450"},
+        "alert_fired": false,
+        "delivery_receipt": false
+      }
+    },
+    {
+      "id": "sustained-errors-alert",
+      "phase": "04",
+      "requirement": ["R06"],
+      "description": "Sustained eligible error rate fires after the defined window and reaches the local sink within 60 s; recovery resolves it.",
+      "expected": {
+        "http_status": 200,
+        "safe_error_code": null,
+        "answer_released": true,
+        "provider_calls": 1,
+        "tool_calls": 0,
+        "run_state": "failed",
+        "unknown_attempts": 0,
+        "attempts": [
+          {"ordinal": 1, "model": "fake-small", "currency": "USD", "status": "failed", "usage_origin": "provider", "input_tokens": null, "output_tokens": null, "charge_state": "observed", "charge": "0.000000"}
+        ],
+        "ledger_charge_total": {"USD": "0.000000"},
+        "alert_fired": true,
+        "delivery_receipt": true
+      }
+    }
+  ]
+}
