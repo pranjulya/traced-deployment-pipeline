@@ -1,6 +1,6 @@
 # Phase 01 — Bounded Agent And Accounting
 
-Status: TESTED — awaiting G2 review. Owner: learner + coding agent. Reviewer: main architect.
+Status: COMPLETE (G2 approved 2026-09-25). Owner: learner + coding agent. Reviewer: main architect.
 
 ## Goal
 Build minimal bounded workload and durable usage path.
@@ -56,5 +56,5 @@ Failure handling: pending-commit failure makes no external call and returns 503;
 Security/privacy: bearer secret compared with `hmac.compare_digest`; idempotency key stored only as a principal-scoped HMAC digest; request bodies, prompts and answers are never written to the ledger (verified by a stored-row scan); readiness requires a writable ledger and valid secrets.
 Deviations: (1) contract correction discovered while implementing — the retry oracle declared a different success token count (400) than the deterministic provider returned (500); the fixture was standardised to 1000/500 for all successes and re-verified, and `money.rule` was added to app/prices.json to match the frozen fixture. This is a Phase 00 fixture correction, recorded here and re-tested. (2) The reference host is macOS/Docker Desktop per G0; Docker Desktop was not running, but Phase 01 runs from the pinned local Python 3.12 venv, so no container was needed.
 Rollback impact: reverting this phase removes app/ and the Phase 01 tests and restores prior requirements files; the ledger schema is additive and no migration runs in reverse, so existing ledger data is preserved.
-Review decision: pending G2 (requirement mapping, evidence, failure handling, rollback impact, privacy and learner explanation).
-Next phase authorization: pending G2 review; Phase 02 must not start before it.
+Review decision: APPROVED at G2 on 2026-09-25 (owner/main architect) — requirement mapping, evidence, failure handling, rollback impact and privacy accepted. Phase 01 marked COMPLETE.
+Next phase authorization: Phase 02 authorized 2026-09-25.

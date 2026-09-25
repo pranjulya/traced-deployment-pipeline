@@ -1,0 +1,55 @@
+name: p09
+
+# Single-host reference deployment (ADR 001). API is the only ingress and is
+# bound to loopback; the telemetry network is internal. Secrets are injected
+# from deploy/.env and never baked into the image.
+
+services:
+  api:
+    image: p09-api:local
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    env_file:
+      - .env
+    environment:
+      P09_DB_PATH: /data/p09-ledger.sqlite
+    ports:
+      - "127.0.0.1:${P09_API_PORT:-8080}:8080"
+    volumes:
+      - ledger-data:/data
+    networks:
+      - ingress
+      - telemetry
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request,json;r=urllib.request.urlopen('http://127.0.0.1:8080/health/ready',timeout=2);print(json.load(r)['status'])"
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+networks:
+  ingress:
+    driver: bridge
+  telemetry:
+    driver: bridge
+    internal: true
+
+volumes:
+  ledger-data:

@@ -58,7 +58,11 @@ def create_app(settings, ledger, agent):
     async def create_run(request: Request):
         header = request.headers.get("authorization", "")
         token = header[7:] if header.lower().startswith("bearer ") else ""
-        if not hmac.compare_digest(token.encode("utf-8"), settings.app_secret.encode("utf-8")):
+        if (
+            not settings.app_secret
+            or not token
+            or not hmac.compare_digest(token.encode("utf-8"), settings.app_secret.encode("utf-8"))
+        ):
             return _error(401, "UNAUTHENTICATED")
 
         body = await request.body()

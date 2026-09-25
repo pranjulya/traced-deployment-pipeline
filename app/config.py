@@ -25,6 +25,7 @@ class Settings:
     app_secret: str
     hmac_secret: str
     db_path: str
+    provider_api_key: str = ""
     principal_alias: str = PRINCIPAL_ALIAS
     default_model: str = "fake-small"
     max_body_bytes: int = MAX_BODY_BYTES
@@ -37,8 +38,10 @@ class Settings:
 
     @classmethod
     def from_env(cls):
+        # Secrets are read from the environment only; there are no embedded defaults.
         return cls(
-            app_secret=os.environ["P09_APP_SECRET"],
-            hmac_secret=os.environ["P09_HMAC_SECRET"],
-            db_path=os.environ.get("P09_DB_PATH", "p09-ledger.sqlite"),
+            app_secret=os.environ.get("P09_APP_SECRET", ""),
+            hmac_secret=os.environ.get("P09_HMAC_SECRET", ""),
+            db_path=os.environ.get("P09_DB_PATH", "/data/p09-ledger.sqlite"),
+            provider_api_key=os.environ.get("P09_PROVIDER_API_KEY", ""),
         )
