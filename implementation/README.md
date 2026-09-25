@@ -1,5 +1,5 @@
 # Phase execution guide
-Phases 00–01 COMPLETE (G1/G2 approved); Phase 02 IN_PROGRESS; phases 03–06 NOT_STARTED. Execute sequentially, opening each only after predecessor review. Phase 00 approves contracts and freezes tests; phases 01–05 build and verify one layer at a time; phase 06 produces release evidence. The authoritative scope, gates and Definition of Done are in ../Implementation.md.
+Phases 00–01 COMPLETE; Phase 02 IMPLEMENTED (live checks blocked by Docker Desktop); Phase 03 IMPLEMENTED/TESTED (live telemetry blocked by the same); phases 04–06 NOT_STARTED. Execute sequentially, opening each only after predecessor review. Phase 00 approves contracts and freezes tests; phases 01–05 build and verify one layer at a time; phase 06 produces release evidence. The authoritative scope, gates and Definition of Done are in ../Implementation.md.
 
 | Phase | Depends on | Exit evidence |
 |---|---|---|
