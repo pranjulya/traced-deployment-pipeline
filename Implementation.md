@@ -1,6 +1,6 @@
 # Project 09 — Traced Deployment Pipeline
 
-Status: G0/G1/G2 approved. Phase 00, 01 COMPLETE; Phase 02 IMPLEMENTED (live rehearsal BLOCKED: Docker Desktop unavailable); Phase 03 IMPLEMENTED/TESTED (SDK+config; live Collector/Tempo BLOCKED by the same); phases 04–06 NOT_STARTED. Owner: learner/main architect. Last reviewed: 2026-09-25.
+Status: G0/G1/G2 approved. Phases 00–01 COMPLETE; Phases 02–04 IMPLEMENTED/TESTED on the daemon-independent paths but their live verification is BLOCKED by Docker Desktop being unavailable (02 container rehearsal, 03 Collector/Tempo, 04 Prometheus/Grafana/Alertmanager). Phases 05–06 NOT_STARTED. No phase may be marked COMPLETE without recorded live evidence. Owner: learner/main architect. Last reviewed: 2026-09-25.
 
 ## Product contract
 Build a reproducible single-host reference deployment of a bounded read-only agent, then prove that an operator can diagnose provider, tool, deployment, and telemetry failures using correlated traces, operational metrics, durable usage accounting, dashboards, and actionable alerts. This is a production-minded learning deployment, not a high-availability service claim.
