@@ -19,7 +19,7 @@ arrives in Phase 01.
 
 import json
 import unittest
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_EVEN
 from pathlib import Path
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
@@ -41,6 +41,8 @@ CURRENCIES = {"USD", "EUR"}
 PHASES = {"01", "02", "03", "04", "05", "06"}
 REQUIREMENTS = {f"R0{i}" for i in range(1, 9)}
 MILLION = Decimal(1_000_000)
+MONEY = PRICES["money"]
+NANO = Decimal(1).scaleb(-int(MONEY["storage_scale"]))
 
 
 def compute_charge(model, input_tokens, output_tokens):
@@ -49,6 +51,14 @@ def compute_charge(model, input_tokens, output_tokens):
         Decimal(input_tokens) * Decimal(price["input_per_million"]) / MILLION
         + Decimal(output_tokens) * Decimal(price["output_per_million"]) / MILLION
     )
+
+
+def to_nano(exact):
+    """Quantize to the declared storage scale; never round a positive charge to zero."""
+    rounded = exact.quantize(NANO, rounding=ROUND_HALF_EVEN)
+    if exact > 0 and rounded == 0:
+        return NANO
+    return rounded
 
 
 class TestOracleSchema(unittest.TestCase):
@@ -110,8 +120,10 @@ class TestChargeArithmetic(unittest.TestCase):
                 else:
                     self.assertEqual(
                         Decimal(attempt["charge"]),
-                        compute_charge(
-                            model, attempt["input_tokens"], attempt["output_tokens"]
+                        to_nano(
+                            compute_charge(
+                                model, attempt["input_tokens"], attempt["output_tokens"]
+                            )
                         ),
                         (case["id"], attempt["ordinal"]),
                     )
@@ -121,6 +133,44 @@ class TestChargeArithmetic(unittest.TestCase):
             for field in ("input_per_million", "output_per_million"):
                 Decimal(model[field])
             self.assertIsInstance(model["input_per_million"], str)
+
+
+class TestMoneyContract(unittest.TestCase):
+    def test_money_contract_declared(self):
+        self.assertEqual(MONEY["representation"], "exact_decimal_string")
+        self.assertEqual(MONEY["storage_scale"], 9)
+        self.assertEqual(MONEY["rounding"], "ROUND_HALF_EVEN")
+        self.assertTrue(MONEY["never_zero_positive"])
+
+    def test_positive_charge_never_rounds_to_zero(self):
+        self.assertEqual(to_nano(Decimal("1E-10")), NANO)
+        self.assertEqual(to_nano(Decimal("1E-9")), Decimal("1E-9"))
+        self.assertEqual(to_nano(Decimal("0")), Decimal("0"))
+        self.assertEqual(to_nano(Decimal("-0.0")), Decimal("0"))
+
+    def test_stored_charges_respect_scale_and_floor(self):
+        for case in CASES:
+            for attempt in case["expected"]["attempts"]:
+                charge = attempt["charge"]
+                if charge is None:
+                    continue
+                value = Decimal(charge)
+                self.assertEqual(value, value.quantize(NANO, rounding=ROUND_HALF_EVEN), (case["id"], attempt["ordinal"]))
+                if value > 0:
+                    self.assertGreaterEqual(value, NANO, (case["id"], attempt["ordinal"]))
+
+
+class TestEnums(unittest.TestCase):
+    def test_attempt_and_run_fields_use_declared_enums(self):
+        enums = CASES_DOC["enum"]
+        for case in CASES:
+            for attempt in case["expected"]["attempts"]:
+                self.assertIn(attempt["status"], enums["attempt_status"], case["id"])
+                self.assertIn(attempt["usage_origin"], enums["usage_origin"], case["id"])
+                self.assertIn(attempt["charge_state"], enums["charge_state"], case["id"])
+            run_state = case["expected"]["run_state"]
+            if run_state is not None:
+                self.assertIn(run_state, enums["run_state"], case["id"])
 
 
 class TestUnknownNeverZero(unittest.TestCase):
@@ -219,6 +269,25 @@ class TestPrivacyContract(unittest.TestCase):
     def test_allowlist_excludes_forbidden_metric_labels(self):
         for forbidden in ALLOWLIST["forbidden_metric_labels"]:
             self.assertNotIn(forbidden, ALLOWLIST["metric_labels"], forbidden)
+
+    def test_evaluation_matrix_negative_cases_present(self):
+        ids = {c["id"] for c in CASES}
+        for required in (
+            "tool-failure",
+            "client-cancelled-before-dispatch",
+            "provider-timeout-unknown",
+            "missing-usage",
+            "price-lookup-miss",
+            "ledger-commit-fail-before-dispatch",
+            "ledger-commit-fail-after-provider",
+            "crash-before-pending-commit",
+            "crash-before-dispatch",
+            "crash-after-dispatch",
+            "duplicate-same-key",
+            "provider-429-then-success",
+            "provider-auth-error-not-retried",
+        ):
+            self.assertIn(required, ids, required)
 
     def test_truth_paths_are_unsampled(self):
         sampling = ALLOWLIST["sampling"]

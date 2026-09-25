@@ -2,6 +2,12 @@
   "schema_version": 1,
   "fixtures_version": "P09-fixtures-0.1.0",
   "note": "Deterministic oracle. Expected values are specified before implementation (Phase 00) and are the review subject for G1. No result may be marked passing without recorded output.",
+  "enum": {
+    "attempt_status": ["pending", "completed", "failed", "unknown"],
+    "usage_origin": ["provider", "estimated", "unknown"],
+    "charge_state": ["observed", "estimated", "unknown", "reconciled"],
+    "run_state": ["accepted", "running", "completed", "failed", "accounting_unknown"]
+  },
   "cases": [
     {
       "id": "success-single-attempt",
@@ -120,7 +126,8 @@
       "id": "provider-retry-success",
       "phase": "01",
       "requirement": ["R01", "R04"],
-      "description": "Transient provider fault then success: each actual attempt counted once within the 30 s deadline.",
+      "description": "Transient provider 500 then success: each actual attempt counted once within the 30 s deadline.",
+      "inject": ["provider_500_on_attempt_1"],
       "expected": {
         "http_status": 200,
         "safe_error_code": null,
@@ -140,6 +147,27 @@
           {"name": "provider.attempt", "parent": "agent.run"},
           {"name": "tool.lookup", "parent": "agent.run"}
         ]
+      }
+    },
+    {
+      "id": "provider-429-then-success",
+      "phase": "01",
+      "requirement": ["R01", "R04"],
+      "description": "Rate-limited 429 is retryable: one retry succeeds and each attempt is accounted separately.",
+      "inject": ["provider_429_on_attempt_1"],
+      "expected": {
+        "http_status": 200,
+        "safe_error_code": null,
+        "answer_released": true,
+        "provider_calls": 2,
+        "tool_calls": 1,
+        "run_state": "completed",
+        "unknown_attempts": 0,
+        "attempts": [
+          {"ordinal": 1, "model": "fake-small", "currency": "USD", "status": "failed", "usage_origin": "provider", "input_tokens": null, "output_tokens": null, "charge_state": "observed", "charge": "0.000000"},
+          {"ordinal": 2, "model": "fake-small", "currency": "USD", "status": "completed", "usage_origin": "provider", "input_tokens": 1000, "output_tokens": 400, "charge_state": "observed", "charge": "0.000390"}
+        ],
+        "ledger_charge_total": {"USD": "0.000390"}
       }
     },
     {
@@ -164,10 +192,31 @@
       }
     },
     {
+      "id": "provider-auth-error-not-retried",
+      "phase": "01",
+      "requirement": ["R01", "R04"],
+      "description": "Provider authentication/schema errors are terminal: exactly one attempt, never retried.",
+      "inject": ["provider_auth_error"],
+      "expected": {
+        "http_status": 502,
+        "safe_error_code": "PROVIDER_AUTH_ERROR",
+        "answer_released": false,
+        "provider_calls": 1,
+        "tool_calls": 0,
+        "run_state": "failed",
+        "unknown_attempts": 0,
+        "attempts": [
+          {"ordinal": 1, "model": "fake-small", "currency": "USD", "status": "failed", "usage_origin": "provider", "input_tokens": null, "output_tokens": null, "charge_state": "observed", "charge": "0.000000"}
+        ],
+        "ledger_charge_total": {"USD": "0.000000"}
+      }
+    },
+    {
       "id": "provider-timeout-unknown",
       "phase": "01",
       "requirement": ["R04"],
       "description": "Provider times out after dispatch; the charge is unknown and must never be recorded as zero.",
+      "inject": ["provider_timeout"],
       "expected": {
         "http_status": 504,
         "safe_error_code": "PROVIDER_TIMEOUT",
@@ -221,10 +270,30 @@
       }
     },
     {
+      "id": "tiny-charge-not-zeroed",
+      "phase": "01",
+      "requirement": ["R04"],
+      "description": "Sub-cent charge (1 input + 1 output token) is preserved at nano precision, not rounded to zero.",
+      "expected": {
+        "http_status": 200,
+        "safe_error_code": null,
+        "answer_released": true,
+        "provider_calls": 1,
+        "tool_calls": 0,
+        "run_state": "completed",
+        "unknown_attempts": 0,
+        "attempts": [
+          {"ordinal": 1, "model": "fake-small", "currency": "USD", "status": "completed", "usage_origin": "provider", "input_tokens": 1, "output_tokens": 1, "charge_state": "observed", "charge": "0.000000750"}
+        ],
+        "ledger_charge_total": {"USD": "0.000000750"}
+      }
+    },
+    {
       "id": "ledger-commit-fail-before-dispatch",
       "phase": "01",
       "requirement": ["R04"],
       "description": "Pending attempt cannot be committed; no external call is made and 503 is returned.",
+      "inject": ["ledger_write_failure"],
       "expected": {
         "http_status": 503,
         "safe_error_code": "ACCOUNTING_UNAVAILABLE",
@@ -242,6 +311,7 @@
       "phase": "01",
       "requirement": ["R04"],
       "description": "Provider returned but completion commit failed: answer withheld, 503 with run_id, uncertainty retained, duplicate stays blocked.",
+      "inject": ["ledger_write_failure_after_provider"],
       "expected": {
         "http_status": 503,
         "safe_error_code": "ACCOUNTING_UNAVAILABLE",
@@ -257,27 +327,29 @@
       }
     },
     {
-      "id": "crash-before-dispatch",
+      "id": "crash-before-pending-commit",
       "phase": "01",
       "requirement": ["R04"],
-      "description": "Crash after admission, before dispatch; startup conservatively marks the run accounting_unknown and does not replay it.",
+      "description": "Crash before the pending attempt commit: durable state proves no dispatch, so no unknown charge is invented.",
+      "inject": ["crash_before_pending_commit"],
       "expected": {
         "http_status": null,
         "safe_error_code": null,
         "answer_released": false,
         "provider_calls": 0,
         "tool_calls": 0,
-        "run_state": "accounting_unknown",
+        "run_state": "failed",
         "unknown_attempts": 0,
         "attempts": [],
         "ledger_charge_total": {}
       }
     },
     {
-      "id": "crash-after-dispatch",
+      "id": "crash-before-dispatch",
       "phase": "01",
       "requirement": ["R04"],
-      "description": "Crash after external dispatch; the unresolved attempt becomes unknown and is never auto-redispatched.",
+      "description": "Crash after the pending attempt commit but before the external call was proven; durable state cannot prove no dispatch, so the pending attempt becomes unknown and is not replayed.",
+      "inject": ["crash_after_pending_commit_before_dispatch"],
       "expected": {
         "http_status": null,
         "safe_error_code": null,
@@ -289,6 +361,44 @@
         "attempts": [
           {"ordinal": 1, "model": "fake-small", "currency": "USD", "status": "unknown", "usage_origin": "unknown", "input_tokens": null, "output_tokens": null, "charge_state": "unknown", "charge": null}
         ],
+        "ledger_charge_total": {}
+      }
+    },
+    {
+      "id": "crash-after-dispatch",
+      "phase": "01",
+      "requirement": ["R04"],
+      "description": "Crash after external dispatch; the unresolved attempt becomes unknown and is never auto-redispatched.",
+      "inject": ["crash_after_dispatch"],
+      "expected": {
+        "http_status": null,
+        "safe_error_code": null,
+        "answer_released": false,
+        "provider_calls": 1,
+        "tool_calls": 0,
+        "run_state": "accounting_unknown",
+        "unknown_attempts": 1,
+        "attempts": [
+          {"ordinal": 1, "model": "fake-small", "currency": "USD", "status": "unknown", "usage_origin": "unknown", "input_tokens": null, "output_tokens": null, "charge_state": "unknown", "charge": null}
+        ],
+        "ledger_charge_total": {}
+      }
+    },
+    {
+      "id": "client-cancelled-before-dispatch",
+      "phase": "01",
+      "requirement": ["R01", "R04"],
+      "description": "Client cancels after admission but before dispatch: no external call and no charge.",
+      "inject": ["client_cancel_before_dispatch"],
+      "expected": {
+        "http_status": null,
+        "safe_error_code": "CLIENT_CANCELLED",
+        "answer_released": false,
+        "provider_calls": 0,
+        "tool_calls": 0,
+        "run_state": "failed",
+        "unknown_attempts": 0,
+        "attempts": [],
         "ledger_charge_total": {}
       }
     },
@@ -329,6 +439,31 @@
         ],
         "ledger_charge_total": {"USD": "0.000000"},
         "non_api_cost": {"state": "not_measured", "note": "host compute/electricity are estimated separately and never silently zeroed"}
+      }
+    },
+    {
+      "id": "tool-failure",
+      "phase": "01",
+      "requirement": ["R01", "R03", "R04"],
+      "description": "Read-only tool raises after a successful provider attempt: run fails with a typed tool error, no payload leak, provider charge still recorded.",
+      "inject": ["tool_failure"],
+      "expected": {
+        "http_status": 502,
+        "safe_error_code": "TOOL_FAILURE",
+        "answer_released": false,
+        "provider_calls": 1,
+        "tool_calls": 1,
+        "run_state": "failed",
+        "unknown_attempts": 0,
+        "attempts": [
+          {"ordinal": 1, "model": "fake-small", "currency": "USD", "status": "completed", "usage_origin": "provider", "input_tokens": 1000, "output_tokens": 500, "charge_state": "observed", "charge": "0.000450"}
+        ],
+        "ledger_charge_total": {"USD": "0.000450"},
+        "spans": [
+          {"name": "agent.run", "parent": null},
+          {"name": "provider.attempt", "parent": "agent.run"},
+          {"name": "tool.lookup", "parent": "agent.run"}
+        ]
       }
     },
     {

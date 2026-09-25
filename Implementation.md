@@ -44,3 +44,4 @@ Dedicated repository selected at G0: `https://github.com/pranjulya/traced-deploy
 - [Phases](implementation/README.md), [evaluation](docs/evaluation/evaluation-strategy.md)
 - [Operations](docs/operations/production-scenarios.md), [learning](Learning/README.md)
 - [Sources](docs/architecture/sources.md), [review](docs/product/morning-review.md)
+- [Accounting & API contract](docs/architecture/accounting-and-api-contract.md), [versions and pins](docs/architecture/versions-and-pins.md)
