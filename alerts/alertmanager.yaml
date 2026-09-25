@@ -1,0 +1,23 @@
+# Alertmanager (Phase 04). Routes only to a local sink; no external chat/email
+# destination is configured or authorized. Grouping is by bounded labels only
+# (never run id, trace id or instance), so cardinality stays low.
+
+route:
+  receiver: local-sink
+  group_by: [alertname, service, severity]
+  group_wait: 10s
+  group_interval: 1m
+  repeat_interval: 4h
+
+receivers:
+  - name: local-sink
+    webhook_configs:
+      - url: http://127.0.0.1:9099/alerts
+        send_resolved: true
+        # A failed delivery is marked failed by Alertmanager; the firing state
+        # is never mistaken for a receipt.
+
+# Example (NOT enabled; requires an explicit destination and authorization):
+#  - name: real-destination
+#    webhook_configs:
+#      - url: REPLACE_ME

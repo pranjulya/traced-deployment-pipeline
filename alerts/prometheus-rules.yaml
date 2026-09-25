@@ -1,0 +1,96 @@
+groups:
+  - name: p09-service
+    rules:
+      - alert: P09ServiceErrorRateHigh
+        expr: |
+          (
+            sum(rate(p09_requests_total{outcome="5xx"}[5m]))
+            /
+            clamp_min(sum(rate(p09_requests_total[5m])), 0.0001)
+          ) > 0.05
+          and
+          sum(increase(p09_requests_total[5m])) >= 20
+        for: 2m
+        labels:
+          severity: critical
+          service: p09-api
+          owner: demo-operator
+        annotations:
+          summary: "Service error rate above 5%"
+          description: "5xx share exceeds 5% with at least 20 requests in 5m, sustained for 2m."
+          runbook: "docs/operations/runbooks.md#service-errors"
+          dashboard: "dashboards/p09-overview.json"
+
+      - alert: P09ProviderTimeoutRateHigh
+        expr: |
+          (
+            sum(rate(p09_provider_timeouts_total[5m]))
+            /
+            clamp_min(sum(rate(p09_provider_attempts_total[5m])), 0.0001)
+          ) > 0.05
+          and
+          sum(increase(p09_provider_attempts_total[5m])) >= 20
+        for: 2m
+        labels:
+          severity: warning
+          service: p09-api
+          owner: demo-operator
+        annotations:
+          summary: "Provider timeout rate above 5%"
+          description: "Timeout share of provider attempts exceeds 5% at the same minimum traffic."
+          runbook: "docs/operations/runbooks.md#provider-timeouts"
+          dashboard: "dashboards/p09-overview.json"
+
+      - alert: P09LedgerWriteFailure
+        expr: increase(p09_ledger_write_failures_total[1m]) > 0
+        labels:
+          severity: critical
+          service: p09-api
+          owner: demo-operator
+        annotations:
+          summary: "Ledger write failure"
+          description: "New billable work is blocked until the ledger is writable; uncertainty is retained."
+          runbook: "docs/operations/runbooks.md#ledger-write-failure"
+          dashboard: "dashboards/p09-overview.json"
+
+      - alert: P09TelemetryDrops
+        expr: increase(p09_telemetry_drops_total[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          service: p09-api
+          owner: demo-operator
+        annotations:
+          summary: "Telemetry export drops"
+          description: "Traces are being dropped; metrics and accounting remain unsampled and unaffected."
+          runbook: "docs/operations/runbooks.md#telemetry-drops"
+          dashboard: "dashboards/p09-overview.json"
+
+  - name: p09-host
+    rules:
+      - alert: P09DiskSpaceLow
+        expr: |
+          (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) < 0.15
+        for: 5m
+        labels:
+          severity: warning
+          service: p09-host
+          owner: demo-operator
+        annotations:
+          summary: "Disk free below 15%"
+          description: "The ledger volume and telemetry backends share the host disk."
+          runbook: "docs/operations/runbooks.md#disk-space-low"
+          dashboard: "dashboards/p09-overview.json"
+
+      - alert: P09HeartbeatAbsent
+        expr: absent(up{job="p09-api"}[2m])
+        for: 2m
+        labels:
+          severity: critical
+          service: p09-api
+          owner: demo-operator
+        annotations:
+          summary: "API scrape heartbeat absent"
+          description: "A fully failed host cannot alert from itself; see the external-observer note."
+          runbook: "docs/operations/runbooks.md#heartbeat-absent"
+          dashboard: "dashboards/p09-overview.json"

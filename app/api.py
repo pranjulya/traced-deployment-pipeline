@@ -66,6 +66,10 @@ def create_app(settings, ledger, agent, telemetry=None):
     @app.get("/metrics")
     async def metrics():
         # Internal-only: served on the same loopback-bound port.
+        try:
+            telemetry.metrics.set_ledger_aggregates(ledger.aggregate())
+        except Exception:
+            pass
         return PlainTextResponse(telemetry.metrics.render(), media_type=CONTENT_TYPE_LATEST)
 
     @app.get("/health/live")

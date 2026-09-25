@@ -9,6 +9,7 @@ best-effort and never blocks a request.
 import json
 from collections import deque
 from contextlib import contextmanager
+from decimal import Decimal
 from pathlib import Path
 
 from opentelemetry.sdk.trace import TracerProvider
@@ -70,23 +71,29 @@ class FailingSpanExporter(SpanExporter):
 class BoundedSpanExporter(SpanExporter):
     """Bounded queue in front of a sink; counts drops and never raises."""
 
-    def __init__(self, sink, max_queue=256):
+    def __init__(self, sink, max_queue=256, on_drop=None):
         self.sink = sink
         self.max_queue = max_queue
+        self.on_drop = on_drop
         self.queue = deque()
         self.spans_dropped = 0
         self.spans_exported = 0
 
+    def _drop(self, count):
+        self.spans_dropped += count
+        if self.on_drop is not None:
+            self.on_drop(count)
+
     def export(self, spans):
         for span in spans:
             if len(self.queue) >= self.max_queue:
-                self.spans_dropped += 1
+                self._drop(1)
                 continue
             self.queue.append(span)
         try:
             self.sink.export(list(self.queue))
         except Exception:
-            self.spans_dropped += len(self.queue)
+            self._drop(len(self.queue))
         else:
             self.spans_exported += len(self.queue)
         finally:
@@ -118,6 +125,31 @@ class Metrics:
         self.tool_outcomes = Counter("p09_tool_outcomes_total", "Tool outcomes.", ["outcome"], registry=self.registry)
         self.timeouts = Counter("p09_provider_timeouts_total", "Provider timeouts.", registry=self.registry)
         self.telemetry_drops = Counter("p09_telemetry_drops_total", "Dropped telemetry items.", registry=self.registry)
+        self.ledger_write_failures = Counter(
+            "p09_ledger_write_failures_total", "Ledger commit failures.", registry=self.registry
+        )
+        self.known_charge_nano = Gauge(
+            "p09_known_charge_nano_total", "Known charge in nano units.", ["currency"], registry=self.registry
+        )
+        self.unknown_attempts = Gauge(
+            "p09_unknown_attempts", "Attempts whose charge is unknown.", registry=self.registry
+        )
+        self.usage_coverage = Gauge(
+            "p09_usage_coverage_ratio", "Known / total attempts.", registry=self.registry
+        )
+        self.reconciliation_lag = Gauge(
+            "p09_reconciliation_lag_seconds", "Age of the oldest unknown attempt.", registry=self.registry
+        )
+
+    def set_ledger_aggregates(self, aggregate):
+        self.known_charge_nano.clear()
+        for currency, amount in aggregate["known_charge"].items():
+            self.known_charge_nano.labels(currency=currency).set(
+                float(Decimal(amount) * Decimal(1_000_000_000))
+            )
+        self.unknown_attempts.set(aggregate["unknown_attempts"])
+        self.usage_coverage.set(aggregate["coverage_ratio"])
+        self.reconciliation_lag.set(aggregate["reconciliation_lag_seconds"])
 
     def render(self):
         return generate_latest(self.registry).decode("utf-8")
@@ -128,14 +160,16 @@ class Telemetry:
         self.allowlist = allowlist or load_allowlist()
         self.deployment_revision = deployment_revision
         self.dropped_attributes = 0
+        self.metrics = Metrics()
         sink = exporter if exporter is not None else InMemorySpanExporter()
-        self.exporter = BoundedSpanExporter(sink, max_queue=max_queue)
+        self.exporter = BoundedSpanExporter(
+            sink, max_queue=max_queue, on_drop=lambda n: self.metrics.telemetry_drops.inc(n)
+        )
         self._provider = TracerProvider(
             sampler=ALWAYS_ON if head_sample_rate >= 1.0 else TraceIdRatioBased(head_sample_rate)
         )
         self._provider.add_span_processor(SimpleSpanProcessor(self.exporter))
         self.tracer = self._provider.get_tracer("p09")
-        self.metrics = Metrics()
 
     # -- schema enforcement -------------------------------------------------
     def _allowed(self, name):
@@ -200,6 +234,9 @@ class NullTelemetry:
     class _Metrics:
         def __getattr__(self, item):
             return _Noop()
+
+        def set_ledger_aggregates(self, aggregate):
+            return None
 
     metrics = _Metrics()
 

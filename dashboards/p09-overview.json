@@ -1,0 +1,144 @@
+{
+  "title": "P09 Traced Deployment Pipeline",
+  "uid": "p09-overview",
+  "schemaVersion": 39,
+  "editable": false,
+  "time": {"from": "now-6h", "to": "now"},
+  "refresh": "30s",
+  "templating": {
+    "list": [
+      {
+        "name": "currency",
+        "label": "currency",
+        "type": "query",
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "query": "label_values(p09_known_charge_nano_total, currency)",
+        "includeAll": false,
+        "multi": true
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Service health (scrape up)",
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+      "targets": [{"expr": "up{job=\"p09-api\"}", "legendFormat": "up"}]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Requests in 5m (sample count)",
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+      "targets": [{"expr": "sum(increase(p09_requests_total[5m]))", "legendFormat": "requests"}]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Error ratio (5xx)",
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+      "targets": [{"expr": "sum(rate(p09_requests_total{outcome=\"5xx\"}[5m])) / clamp_min(sum(rate(p09_requests_total[5m])), 0.0001)", "legendFormat": "5xx ratio"}]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Telemetry drops (5m)",
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+      "targets": [{"expr": "sum(increase(p09_telemetry_drops_total[5m]))", "legendFormat": "drops"}]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Request rate by outcome",
+      "gridPos": {"h": 7, "w": 12, "x": 0, "y": 4},
+      "targets": [{"expr": "sum by (outcome) (rate(p09_requests_total[5m]))", "legendFormat": "{{outcome}}"}]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Latency p50 / p95 / p99",
+      "description": "Percentiles with visible sample counts; few samples must not imply confidence.",
+      "gridPos": {"h": 7, "w": 12, "x": 12, "y": 4},
+      "targets": [
+        {"expr": "histogram_quantile(0.50, sum by (le) (rate(p09_request_latency_seconds_bucket[5m])))", "legendFormat": "p50"},
+        {"expr": "histogram_quantile(0.95, sum by (le) (rate(p09_request_latency_seconds_bucket[5m])))", "legendFormat": "p95"},
+        {"expr": "histogram_quantile(0.99, sum by (le) (rate(p09_request_latency_seconds_bucket[5m])))", "legendFormat": "p99"}
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Retry amplification (provider attempts / requests)",
+      "gridPos": {"h": 7, "w": 8, "x": 0, "y": 11},
+      "targets": [{"expr": "sum(rate(p09_provider_attempts_total[5m])) / clamp_min(sum(rate(p09_requests_total{operation=\"http\"}[5m])), 0.0001)", "legendFormat": "attempts/request"}]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Provider attempts by model / outcome",
+      "gridPos": {"h": 7, "w": 8, "x": 8, "y": 11},
+      "targets": [{"expr": "sum by (model_alias, outcome) (rate(p09_provider_attempts_total[5m]))", "legendFormat": "{{model_alias}} {{outcome}}"}]
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Tool outcomes",
+      "gridPos": {"h": 7, "w": 8, "x": 16, "y": 11},
+      "targets": [{"expr": "sum by (outcome) (rate(p09_tool_outcomes_total[5m]))", "legendFormat": "{{outcome}}"}]
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Known charge by currency (major units)",
+      "description": "Currency is selected explicitly; totals are never summed across currencies.",
+      "gridPos": {"h": 7, "w": 8, "x": 0, "y": 18},
+      "targets": [{"expr": "p09_known_charge_nano_total{currency=~\"$currency\"} / 1e9", "legendFormat": "{{currency}}"}]
+    },
+    {
+      "id": 11,
+      "type": "stat",
+      "title": "Unknown-charge attempts",
+      "description": "Uncertainty is shown separately and never folded into the known total.",
+      "gridPos": {"h": 7, "w": 8, "x": 8, "y": 18},
+      "targets": [{"expr": "p09_unknown_attempts", "legendFormat": "unknown"}]
+    },
+    {
+      "id": 12,
+      "type": "stat",
+      "title": "Usage coverage (known / total)",
+      "gridPos": {"h": 7, "w": 8, "x": 16, "y": 18},
+      "targets": [{"expr": "p09_usage_coverage_ratio", "legendFormat": "coverage"}]
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Host resources (CPU / RAM / disk)",
+      "gridPos": {"h": 7, "w": 12, "x": 0, "y": 25},
+      "targets": [
+        {"expr": "1 - avg(rate(node_cpu_seconds_total{mode=\"idle\"}[5m]))", "legendFormat": "cpu busy"},
+        {"expr": "1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)", "legendFormat": "memory used"},
+        {"expr": "1 - (node_filesystem_avail_bytes{mountpoint=\"/\"} / node_filesystem_size_bytes{mountpoint=\"/\"})", "legendFormat": "disk used"}
+      ]
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "Ledger write failures",
+      "gridPos": {"h": 7, "w": 12, "x": 12, "y": 25},
+      "targets": [{"expr": "sum(increase(p09_ledger_write_failures_total[5m]))", "legendFormat": "ledger failures"}]
+    }
+  ],
+  "annotations": {
+    "list": [
+      {
+        "name": "Releases",
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "enable": true,
+        "expr": "changes(p09_build_info[5m])",
+        "title": "release",
+        "textFormat": "release {{deployment_revision}}"
+      }
+    ]
+  }
+}

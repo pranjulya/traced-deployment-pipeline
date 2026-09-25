@@ -75,6 +75,7 @@ class Agent:
                 )
             except LedgerUnavailable:
                 # No external call is made when the pending commit fails.
+                self.telemetry.metrics.ledger_write_failures.inc()
                 raise AgentError("ACCOUNTING_UNAVAILABLE", 503, None)
 
             try:
@@ -137,6 +138,7 @@ class Agent:
         try:
             self.ledger.set_run_state(run_id, "completed")
         except LedgerUnavailable:
+            self.telemetry.metrics.ledger_write_failures.inc()
             self._best_effort_state(run_id, "accounting_unknown", "ACCOUNTING_UNAVAILABLE")
             raise AgentError("ACCOUNTING_UNAVAILABLE", 503, "accounting_unknown")
         return AgentResult(
@@ -195,6 +197,7 @@ class Agent:
             )
         except LedgerUnavailable:
             # Withhold output; preserve uncertainty so restart can classify it.
+            self.telemetry.metrics.ledger_write_failures.inc()
             self._best_effort(lambda: self.ledger.unknown_attempt(attempt_id))
             self._best_effort_state(run_id, "accounting_unknown", "ACCOUNTING_UNAVAILABLE")
             raise AgentError("ACCOUNTING_UNAVAILABLE", 503, "accounting_unknown")

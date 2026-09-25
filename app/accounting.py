@@ -217,6 +217,37 @@ class Ledger:
             totals[attempt["currency"]] = totals.get(attempt["currency"], Decimal(0)) + Decimal(attempt["charge"])
         return {currency: format_nano(value) for currency, value in totals.items()}
 
+    def aggregate(self, now=None):
+        """Unsampled ledger aggregates for dashboards. Known charges stay per currency."""
+        now = now or _utcnow()
+        rows = self._conn.execute(
+            "SELECT charge_state, currency, charge, started_at FROM usage_attempt"
+        ).fetchall()
+        known = {}
+        unknown = 0
+        total = 0
+        known_count = 0
+        oldest_unknown = None
+        for row in rows:
+            total += 1
+            if row["charge_state"] == "unknown" or row["charge"] is None:
+                unknown += 1
+                started = datetime.fromisoformat(row["started_at"])
+                if oldest_unknown is None or started < oldest_unknown:
+                    oldest_unknown = started
+            else:
+                known[row["currency"]] = known.get(row["currency"], Decimal(0)) + Decimal(row["charge"])
+                known_count += 1
+        lag = (now - oldest_unknown).total_seconds() if oldest_unknown else 0.0
+        return {
+            "known_charge": {currency: format_nano(value) for currency, value in known.items()},
+            "unknown_attempts": unknown,
+            "total_attempts": total,
+            "known_attempts": known_count,
+            "coverage_ratio": (known_count / total) if total else 1.0,
+            "reconciliation_lag_seconds": max(lag, 0.0),
+        }
+
     # -- restart classification -------------------------------------------
     def recover_on_startup(self, now=None):
         now = now or _utcnow()
