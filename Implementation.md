@@ -1,6 +1,6 @@
 # Project 09 — Traced Deployment Pipeline
 
-Status: G0_APPROVED (2026-09-25). Phase 00 TESTED at `6537e76`, awaiting G1 review; phases 01–06 NOT_STARTED. Owner: learner/main architect. Last reviewed: 2026-09-25.
+Status: G0 and G1 approved. Phase 00 COMPLETE at `4b2e465`; Phase 01 TESTED at `93666a0`, awaiting G2 review; phases 02–06 NOT_STARTED. Owner: learner/main architect. Last reviewed: 2026-09-25.
 
 ## Product contract
 Build a reproducible single-host reference deployment of a bounded read-only agent, then prove that an operator can diagnose provider, tool, deployment, and telemetry failures using correlated traces, operational metrics, durable usage accounting, dashboards, and actionable alerts. This is a production-minded learning deployment, not a high-availability service claim.

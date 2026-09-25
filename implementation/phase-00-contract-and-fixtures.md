@@ -1,6 +1,6 @@
 # Phase 00 — Contract And Fixtures
 
-Status: TESTED — awaiting G1 review. Owner: learner + coding agent. Reviewer: main architect. No application code written.
+Status: COMPLETE (G1 approved 2026-09-25). Owner: learner + coding agent. Reviewer: main architect. No application code written.
 
 ## Goal
 Freeze the operational contract before code.
@@ -40,5 +40,5 @@ Deviations: the reference host is macOS/Docker Desktop per G0 instead of Linux; 
 Representative failure reviewed: the first oracle run exposed an over-strict invariant — `price-lookup-miss` has provider-observed usage but an unknown charge. The check was corrected to treat `charge_state` and `usage_origin` as independent while still forbidding any numeric charge when `charge_state` is unknown. This is the "known usage, unknown price" versus "unknown usage, unknown charge" distinction.
 G1 pre-review fixes applied before approval: (1) money representation pinned to exact decimal at nano scale with a never-round-positive-to-zero rule; (2) added `tool-failure`, `client-cancelled-before-dispatch`, `provider-429-then-success`, `provider-auth-error-not-retried`, `tiny-charge-not-zeroed`; (3) split the crash window into `crash-before-pending-commit` (durable state proves no dispatch) and `crash-before-dispatch` (pending row committed, dispatch unproven); (4) froze HTTP status, safe error codes, enums and retry rules in docs/architecture/accounting-and-api-contract.md.
 Acceptance criteria status: ADR choices recorded (G0); versions and resource budget selected (versions-and-pins.md); fixture oracle present and internally consistent (24 checks pass).
-Review decision: pending G1 — fixtures and expected failure behavior must be reviewed before Phase 01 code.
-Next phase authorization: pending G1 review; Phase 01 must not start before it.
+Review decision: APPROVED at G1 on 2026-09-25 (owner/main architect). Fixtures, expected failure behavior, money contract and status codes accepted; Phase 00 marked COMPLETE.
+Next phase authorization: Phase 01 authorized 2026-09-25.
