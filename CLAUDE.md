@@ -1,0 +1,2 @@
+# Project operating instructions
+Read AGENTS.md and Implementation.md first. They define the same workflow for every coding agent. This is PLANNING_ONLY; no implementation files are present or requested. All future source paths in phase files are proposals. Maintain one active phase and evidence-driven gates. Never invent benchmark results or call a local single-host reference high availability. No separate agent-specific policies or duplicate source of truth.

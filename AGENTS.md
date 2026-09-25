@@ -1,0 +1,6 @@
+# Coding-agent workflow
+Planning package only. Do not implement until user approves phase 00. Implementation.md controls scope and state. Read PRD → HLD → evaluation → LLD → ADRs → active phase; state assumptions and stop only for genuinely blocking ambiguity. Implement one approved phase at a time, smallest change; do not alter other projects.
+
+Before changes, inspect existing repository and callers; use graph tools and coverage if available, otherwise disclose absence and inspect source directly. Never claim graph coverage without evidence. Write meaningful fixture checks before nontrivial implementation. Keep telemetry payload-free and accounting independent of traces. Never replace unknown cost with zero.
+
+Review gate requires requirement mapping, actual test evidence, failure handling, rollback impact, security/privacy check and learner explanation. Mark COMPLETE only after review; record commands/results in the active phase. Changes to contracts update master and affected docs/ADRs together. No deployment, paid calls, external notification or publication without authorization. No .claude specialists or commands: seven explicit phase files already provide the necessary workflow; add only when a repeated task justifies them.

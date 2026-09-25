@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local runtime and secrets (never commit)
+.env
+.env.*
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.db
+
+# Evidence and captures (sanitized copies only, with checksums)
+reports/
+evidence/
+*.DS_Store
+
+# Editor
+.idea/
+.vscode/
