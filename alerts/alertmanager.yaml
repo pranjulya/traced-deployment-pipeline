@@ -12,7 +12,8 @@ route:
 receivers:
   - name: local-sink
     webhook_configs:
-      - url: http://127.0.0.1:9099/alerts
+      # In-Compose service DNS; on the internal telemetry network, never external.
+      - url: http://sink:9099/alerts
         send_resolved: true
         # A failed delivery is marked failed by Alertmanager; the firing state
         # is never mistaken for a receipt.

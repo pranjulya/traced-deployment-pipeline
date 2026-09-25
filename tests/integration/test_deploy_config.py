@@ -78,3 +78,49 @@ def test_env_example_contains_placeholders_only():
 
 def test_compose_declares_pinned_local_image_tag():
     assert API["image"] == "p09-api:local"
+
+
+def test_full_observability_stack_services_present():
+    services = set(COMPOSE["services"])
+    assert {
+        "api",
+        "collector",
+        "tempo",
+        "prometheus",
+        "alertmanager",
+        "grafana",
+        "sink",
+        "node-exporter",
+    } <= services
+
+
+def test_all_published_ports_are_loopback():
+    for name, service in COMPOSE["services"].items():
+        for port in service.get("ports", []):
+            assert port.startswith("127.0.0.1:"), (name, port)
+
+
+def test_internal_services_publish_no_ports():
+    for name in ("collector", "tempo", "sink", "node-exporter"):
+        assert not COMPOSE["services"][name].get("ports"), name
+
+
+def test_stack_configs_are_mounted_read_only():
+    assert (
+        "./collector/collector-config.yaml:/etc/otelcol/config.yaml:ro"
+        in COMPOSE["services"]["collector"]["volumes"]
+    )
+    assert any("prometheus-rules.yaml" in v for v in COMPOSE["services"]["prometheus"]["volumes"])
+    assert any("alertmanager.yaml" in v for v in COMPOSE["services"]["alertmanager"]["volumes"])
+    assert any("grafana/provisioning" in v for v in COMPOSE["services"]["grafana"]["volumes"])
+
+
+def test_api_exports_to_collector_but_readiness_is_independent():
+    env = COMPOSE["services"]["api"]["environment"]
+    assert env["P09_OTLP_ENDPOINT"].startswith("http://collector:")
+    assert "collector" not in (COMPOSE["services"]["api"].get("depends_on") or [])
+
+
+def test_pinned_image_digests_for_third_party_services():
+    for name in ("collector", "tempo", "prometheus", "alertmanager", "grafana", "node-exporter"):
+        assert "@sha256:" in COMPOSE["services"][name]["image"], name

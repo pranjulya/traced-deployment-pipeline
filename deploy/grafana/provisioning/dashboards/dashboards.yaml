@@ -1,0 +1,9 @@
+apiVersion: 1
+
+providers:
+  - name: p09
+    folder: P09
+    type: file
+    disableDeletion: true
+    options:
+      path: /var/lib/grafana/dashboards

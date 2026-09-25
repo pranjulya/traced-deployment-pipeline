@@ -1,8 +1,10 @@
 name: p09
 
-# Single-host reference deployment (ADR 001). API is the only ingress and is
-# bound to loopback; the telemetry network is internal. Secrets are injected
-# from deploy/.env and never baked into the image.
+# Single-host reference deployment (ADR 001). The API is the only application
+# ingress and is bound to loopback; metrics/trace admin UIs are loopback only;
+# the telemetry network is internal. Secrets are injected from deploy/.env and
+# never baked into images. Exact image versions are pinned in docker-compose
+# via digests recorded in docs/architecture/versions-and-pins.md.
 
 services:
   api:
@@ -14,6 +16,9 @@ services:
       - .env
     environment:
       P09_DB_PATH: /data/p09-ledger.sqlite
+      P09_OTLP_ENDPOINT: http://collector:4318/v1/traces
+      P09_REVISION: ${P09_REVISION:-dev}
+      P09_TRACE_HEAD_RATE: ${P09_TRACE_HEAD_RATE:-1.0}
     ports:
       - "127.0.0.1:${P09_API_PORT:-8080}:8080"
     volumes:
@@ -44,6 +49,148 @@ services:
       retries: 5
       start_period: 5s
 
+  collector:
+    image: otel/opentelemetry-collector-contrib@sha256:fd328de2552466ad78385e1b1289c3f2402b1c45f265b252aab1955b42845ac1
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./collector/collector-config.yaml:/etc/otelcol/config.yaml:ro
+    networks:
+      - telemetry
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+
+  tempo:
+    image: grafana/tempo@sha256:65a5789759435f1ef696f1953258b9bbdb18eb571d5ce711ff812d2e128288a4
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./tempo/tempo.yaml:/etc/tempo.yaml:ro
+      - tempo-data:/var/tempo
+    networks:
+      - telemetry
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+
+  prometheus:
+    image: prom/prometheus@sha256:efd719c99d83b060d9daefdcf00360461adf279f45ef5391f8d111892118753e
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=7d"
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../alerts/prometheus-rules.yaml:/etc/prometheus/rules/p09-rules.yaml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - ingress
+      - telemetry
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+
+  alertmanager:
+    image: prom/alertmanager@sha256:e9733bafb1bdef9b00e25a21f8f99dc26a22224bf16641ad754d1649f4c3357a
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+    ports:
+      - "127.0.0.1:9093:9093"
+    volumes:
+      - ../alerts/alertmanager.yaml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    networks:
+      - ingress
+      - telemetry
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+
+  grafana:
+    image: grafana/grafana@sha256:ac461fb352abc50da10a51c7d02462e9c05488f11f53f14b3ad79a8145f638a0
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${P09_GRAFANA_ADMIN_PASSWORD:?set P09_GRAFANA_ADMIN_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    networks:
+      - ingress
+      - telemetry
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+
+  sink:
+    image: p09-api:local
+    depends_on:
+      - api
+    command: ["python", "/scripts/notify_sink.py", "9099"]
+    environment:
+      P09_SINK_FILE: /receipts/receipts.jsonl
+    volumes:
+      - ./sink:/scripts:ro
+      - sink-data:/receipts
+    networks:
+      - telemetry
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+
+  node-exporter:
+    image: prom/node-exporter@sha256:1b4e4438faca4dd7e001dd445d161a4a2091b0fededa84093b3a8dfeae1f1be0
+    command:
+      - "--path.procfs=/host/proc"
+      - "--path.sysfs=/host/sys"
+      - "--path.rootfs=/host/root"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host/root:ro
+    networks:
+      - telemetry
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+
 networks:
   ingress:
     driver: bridge
@@ -53,3 +200,8 @@ networks:
 
 volumes:
   ledger-data:
+  prometheus-data:
+  grafana-data:
+  tempo-data:
+  alertmanager-data:
+  sink-data:

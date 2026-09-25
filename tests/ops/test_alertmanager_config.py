@@ -1,6 +1,7 @@
 """Static validation of Alertmanager routing (Phase 04, R06)."""
 
 from pathlib import Path
+from urllib.parse import urlparse
 
 import yaml
 
@@ -12,8 +13,9 @@ def test_routes_only_to_local_sink():
     assert AM["route"]["receiver"] == "local-sink"
     webhooks = [w for receiver in AM["receivers"] for w in receiver.get("webhook_configs", [])]
     assert webhooks
+    # Loopback when run on the host, or the in-Compose internal service DNS.
     for webhook in webhooks:
-        assert webhook["url"].startswith("http://127.0.0.1:")
+        assert urlparse(webhook["url"]).hostname in {"127.0.0.1", "sink", "localhost"}
 
 
 def test_grouping_is_bounded():

@@ -23,6 +23,7 @@ Every image publishes an `arm64` variant. Digests are immutable; a tag re-point 
 | Metrics | `prom/prometheus` | `v3.15.0` | `sha256:efd719c99d83b060d9daefdcf00360461adf279f45ef5391f8d111892118753e` | `sha256:6b41f7a45cfbd1d259a78701ee5e14fc2ad9383c9aa5d0427345a18539bc3c91` |
 | Dashboards | `grafana/grafana` | `13.2.2` | `sha256:ac461fb352abc50da10a51c7d02462e9c05488f11f53f14b3ad79a8145f638a0` | `sha256:d523f1346c0cd277de119bc1acb21b39ec89427975ae8b0815561698e859f725` |
 | Alerts | `prom/alertmanager` | `v0.34.1` | `sha256:e9733bafb1bdef9b00e25a21f8f99dc26a22224bf16641ad754d1649f4c3357a` | `sha256:47a1dc7e74f1e755e29f74d392262f8d1da41f2ada5653911199bf07219e41d9` |
+| Host metrics | `prom/node-exporter` | `v1.12.1` | `sha256:1b4e4438faca4dd7e001dd445d161a4a2091b0fededa84093b3a8dfeae1f1be0` | `sha256:c9ef89f9464f09e7234decaae68a80ab856ff0014435677a99fd48b03dd410ea` |
 
 ## Native histogram decision
 Prometheus histograms are the default for latency. Whether native histograms are used depends on the pinned Prometheus/Grafana support and will be confirmed in Phase 03; otherwise explicit fixed buckets are used. This is left open here because the failure scenario "unsupported histogram integration" is a Phase 00 concern to record, not to assume.
