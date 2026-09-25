@@ -1,0 +1,63 @@
+# OTel Collector (Phase 03). Defense in depth after SDK-side minimisation:
+# content-free allowlist, bounded memory and a bounded retry queue.
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 192
+    spike_limit_mib: 48
+  attributes/p09_allowlist:
+    actions:
+      - {key: prompt, action: delete}
+      - {key: output, action: delete}
+      - {key: tool_arguments, action: delete}
+      - {key: authorization, action: delete}
+      - {key: cookie, action: delete}
+      - {key: idempotency_key, action: delete}
+      - {key: run_id, action: delete}
+      - {key: trace_id, action: delete}
+      - {key: user_id, action: delete}
+      - {key: email, action: delete}
+      - {key: api_key, action: delete}
+  batch:
+    send_batch_size: 512
+    send_batch_max_size: 1024
+    timeout: 5s
+
+exporters:
+  otlp/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+    sending_queue:
+      enabled: true
+      num_consumers: 4
+      queue_size: 1000
+    retry_on_failure:
+      enabled: true
+      initial_interval: 1s
+      max_interval: 10s
+      max_elapsed_time: 60s
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+service:
+  extensions: [health_check]
+  telemetry:
+    metrics:
+      level: basic
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, attributes/p09_allowlist, batch]
+      exporters: [otlp/tempo]

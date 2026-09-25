@@ -8,14 +8,17 @@ docs/architecture/accounting-and-api-contract.md.
 import asyncio
 import hashlib
 import hmac
+import time
 import uuid
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
+from prometheus_client import CONTENT_TYPE_LATEST
 from starlette.concurrency import run_in_threadpool
 
 from .agent import AgentError
 from .config import KEY_ALPHABET, KEY_MAX, KEY_MIN
+from .telemetry import NullTelemetry
 
 
 def key_is_valid(key):
@@ -38,9 +41,32 @@ def _error(status, code, run_id=None):
     return JSONResponse(status_code=status, content=body)
 
 
-def create_app(settings, ledger, agent):
+def create_app(settings, ledger, agent, telemetry=None):
+    telemetry = telemetry or NullTelemetry()
     app = FastAPI(title="P09 bounded agent", docs_url=None, redoc_url=None, openapi_url=None)
     capacity = asyncio.Semaphore(settings.max_concurrency)
+
+    @app.middleware("http")
+    async def _record_metrics(request: Request, call_next):
+        telemetry.metrics.in_flight.inc()
+        start = time.perf_counter()
+        try:
+            response = await call_next(request)
+        finally:
+            telemetry.metrics.in_flight.dec()
+        route = "/v1/runs" if request.url.path == "/v1/runs" else "other"
+        telemetry.metrics.latency.labels(route_template=route, operation="http").observe(
+            time.perf_counter() - start
+        )
+        telemetry.metrics.requests.labels(
+            route_template=route, operation="http", outcome=f"{response.status_code // 100}xx"
+        ).inc()
+        return response
+
+    @app.get("/metrics")
+    async def metrics():
+        # Internal-only: served on the same loopback-bound port.
+        return PlainTextResponse(telemetry.metrics.render(), media_type=CONTENT_TYPE_LATEST)
 
     @app.get("/health/live")
     async def live():

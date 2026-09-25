@@ -27,6 +27,7 @@ class ProviderError(Exception):
         super().__init__(safe_code)
         self.kind = kind
         self.safe_code = safe_code
+        self.safe_error_code = safe_code
 
 
 class FakeProvider:

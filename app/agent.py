@@ -1,8 +1,9 @@
-"""Bounded agent execution.
+"""Bounded agent execution with content-free telemetry.
 
 Bounds: one shared deadline, at most MAX_PROVIDER_ATTEMPTS provider attempts
 and MAX_TOOL_CALLS tool calls. Commit pending before dispatch; withhold output
-when a completion commit fails.
+when a completion commit fails. Spans follow actual execution parentage:
+agent.run -> provider.attempt / tool.lookup.
 """
 
 from dataclasses import dataclass, field
@@ -12,6 +13,7 @@ from time import monotonic
 from .accounting import LedgerUnavailable
 from .money import compute_charge, format_nano
 from .providers import Kind, ProviderError
+from .telemetry import NullTelemetry
 from .tools import ToolError
 
 
@@ -33,14 +35,24 @@ class AgentResult:
 
 
 class Agent:
-    def __init__(self, ledger, provider, tool, price_table, settings):
+    def __init__(self, ledger, provider, tool, price_table, settings, telemetry=None):
         self.ledger = ledger
         self.provider = provider
         self.tool = tool
         self.price_table = price_table
         self.settings = settings
+        self.telemetry = telemetry or NullTelemetry()
 
     def execute(self, run_id, *, model=None, messages=None, cancel_check=None, price_date=None):
+        with self.telemetry.span(
+            "agent.run",
+            {"operation": "run", "deployment_revision": self.telemetry.deployment_revision},
+        ):
+            return self._execute(
+                run_id, model=model, messages=messages, cancel_check=cancel_check, price_date=price_date
+            )
+
+    def _execute(self, run_id, *, model=None, messages=None, cancel_check=None, price_date=None):
         model = model or self.settings.default_model
         messages = messages or []
         price_date = price_date or datetime.now(timezone.utc).date()
@@ -66,9 +78,22 @@ class Agent:
                 raise AgentError("ACCOUNTING_UNAVAILABLE", 503, None)
 
             try:
-                result = self.provider.call(messages, model, deadline)
+                with self.telemetry.span(
+                    "provider.attempt",
+                    {
+                        "provider_alias": self.provider.alias,
+                        "model_alias": model,
+                        "attempt_ordinal": ordinal,
+                        "status": "pending",
+                    },
+                ):
+                    result = self.provider.call(messages, model, deadline)
             except ProviderError as error:
+                self.telemetry.metrics.provider_attempts.labels(
+                    model_alias=model, outcome=error.safe_code
+                ).inc()
                 if error.kind == Kind.TIMEOUT:
+                    self.telemetry.metrics.timeouts.inc()
                     self._best_effort(lambda: self.ledger.unknown_attempt(attempt_id))
                     self._best_effort_state(run_id, "failed", "PROVIDER_TIMEOUT")
                     raise AgentError("PROVIDER_TIMEOUT", 504, "failed")
@@ -87,6 +112,7 @@ class Agent:
                     raise AgentError("PROVIDER_UNAVAILABLE", 502, "failed")
                 continue
             else:
+                self.telemetry.metrics.provider_attempts.labels(model_alias=model, outcome="success").inc()
                 self._complete_attempt(run_id, attempt_id, model, result, price_date)
                 break
 
@@ -97,8 +123,13 @@ class Agent:
                 raise AgentError("CLIENT_CANCELLED", None, "failed")
             tool_calls += 1
             try:
-                self.tool.lookup("alpha")
+                with self.telemetry.span(
+                    "tool.lookup", {"tool_alias": self.tool.alias, "status": "pending"}
+                ):
+                    self.tool.lookup("alpha")
+                    self.telemetry.metrics.tool_outcomes.labels(outcome="success").inc()
             except ToolError:
+                self.telemetry.metrics.tool_outcomes.labels(outcome="failure").inc()
                 self._best_effort_state(run_id, "failed", "TOOL_FAILURE")
                 raise AgentError("TOOL_FAILURE", 502, "failed")
             break

@@ -9,6 +9,7 @@ class ToolError(Exception):
     def __init__(self, safe_code="TOOL_FAILURE"):
         super().__init__(safe_code)
         self.safe_code = safe_code
+        self.safe_error_code = safe_code
 
 
 class LookupTool:
