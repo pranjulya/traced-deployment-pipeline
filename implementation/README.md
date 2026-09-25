@@ -1,5 +1,5 @@
 # Phase execution guide
-All phases NOT_STARTED. Execute sequentially, opening each only after predecessor review. Phase 00 approves contracts and freezes tests; phases 01–05 build and verify one layer at a time; phase 06 produces release evidence. The authoritative scope, gates and Definition of Done are in ../Implementation.md.
+Phase 00 TESTED (awaiting G1 review); phases 01–06 NOT_STARTED. Execute sequentially, opening each only after predecessor review. Phase 00 approves contracts and freezes tests; phases 01–05 build and verify one layer at a time; phase 06 produces release evidence. The authoritative scope, gates and Definition of Done are in ../Implementation.md.
 
 | Phase | Depends on | Exit evidence |
 |---|---|---|
