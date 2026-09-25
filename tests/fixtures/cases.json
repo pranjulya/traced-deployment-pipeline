@@ -138,9 +138,9 @@
         "unknown_attempts": 0,
         "attempts": [
           {"ordinal": 1, "model": "fake-small", "currency": "USD", "status": "failed", "usage_origin": "provider", "input_tokens": null, "output_tokens": null, "charge_state": "observed", "charge": "0.000000"},
-          {"ordinal": 2, "model": "fake-small", "currency": "USD", "status": "completed", "usage_origin": "provider", "input_tokens": 1000, "output_tokens": 400, "charge_state": "observed", "charge": "0.000390"}
+          {"ordinal": 2, "model": "fake-small", "currency": "USD", "status": "completed", "usage_origin": "provider", "input_tokens": 1000, "output_tokens": 500, "charge_state": "observed", "charge": "0.000450"}
         ],
-        "ledger_charge_total": {"USD": "0.000390"},
+        "ledger_charge_total": {"USD": "0.000450"},
         "spans": [
           {"name": "agent.run", "parent": null},
           {"name": "provider.attempt", "parent": "agent.run"},
@@ -165,9 +165,9 @@
         "unknown_attempts": 0,
         "attempts": [
           {"ordinal": 1, "model": "fake-small", "currency": "USD", "status": "failed", "usage_origin": "provider", "input_tokens": null, "output_tokens": null, "charge_state": "observed", "charge": "0.000000"},
-          {"ordinal": 2, "model": "fake-small", "currency": "USD", "status": "completed", "usage_origin": "provider", "input_tokens": 1000, "output_tokens": 400, "charge_state": "observed", "charge": "0.000390"}
+          {"ordinal": 2, "model": "fake-small", "currency": "USD", "status": "completed", "usage_origin": "provider", "input_tokens": 1000, "output_tokens": 500, "charge_state": "observed", "charge": "0.000450"}
         ],
-        "ledger_charge_total": {"USD": "0.000390"}
+        "ledger_charge_total": {"USD": "0.000450"}
       }
     },
     {
