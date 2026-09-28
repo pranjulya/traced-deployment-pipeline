@@ -1,5 +1,5 @@
 # Coding-agent workflow
-Planning package only. Do not implement until user approves phase 00. Implementation.md controls scope and state. Read PRD → HLD → evaluation → LLD → ADRs → active phase; state assumptions and stop only for genuinely blocking ambiguity. Implement one approved phase at a time, smallest change; do not alter other projects.
+Phases 00–01 are complete and `app/` / `deploy/` exist. Phases 02–04 are implemented but live Docker verification is still blocked. Phases 05–06 are not started. Implementation.md controls scope and state. Do not start a new phase until the user approves it. Read PRD → HLD → evaluation → LLD → ADRs → active phase; state assumptions and stop only for genuinely blocking ambiguity. Implement one approved phase at a time, smallest change; do not alter other projects.
 
 Before changes, inspect existing repository and callers; use graph tools and coverage if available, otherwise disclose absence and inspect source directly. Never claim graph coverage without evidence. Write meaningful fixture checks before nontrivial implementation. Keep telemetry payload-free and accounting independent of traces. Never replace unknown cost with zero.
 
