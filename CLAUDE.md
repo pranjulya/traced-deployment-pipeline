@@ -1,2 +1,2 @@
 # Project operating instructions
-Read AGENTS.md and Implementation.md first. They define the same workflow for every coding agent. Implementation files are present under `app/` and `deploy/`. Phases 00–01 are complete; 02–04 need live Docker evidence; 05–06 are not started. Treat Implementation.md as authoritative for status; phase file paths that are already on disk are not proposals. Maintain one active phase and evidence-driven gates. Never invent benchmark results or call a local single-host reference high availability. No separate agent-specific policies or duplicate source of truth.
+Read AGENTS.md first, then Implementation.md. They are the single source of truth for every coding agent; do not add agent-specific policies or duplicate their content here.
