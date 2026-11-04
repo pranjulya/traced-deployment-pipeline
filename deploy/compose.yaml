@@ -153,6 +153,7 @@ services:
     command: ["python", "/scripts/notify_sink.py", "9099"]
     environment:
       P09_SINK_FILE: /receipts/receipts.jsonl
+      P09_SINK_HOST: 0.0.0.0
     volumes:
       - ./sink:/scripts:ro
       - sink-data:/receipts
