@@ -46,8 +46,8 @@ check "container runs as UID 10001" "[ \"\$($COMPOSE exec -T api id -u)\" = 1000
 
 note "loopback-only publication"
 check "api bound to 127.0.0.1" "$COMPOSE port api 8080 | head -1 | grep -q '^127.0.0.1:'"
-for ui in prometheus grafana alertmanager; do
-  check "$ui bound to 127.0.0.1" "$COMPOSE port $ui | head -1 | grep -q '^127.0.0.1:'"
+for ui in prometheus:9090 grafana:3000 alertmanager:9093; do
+  check "${ui%%:*} bound to 127.0.0.1" "$COMPOSE port ${ui%%:*} ${ui##*:} | head -1 | grep -q '^127.0.0.1:'"
 done
 
 note "authenticated fixture completes"
@@ -63,7 +63,8 @@ check "p09-api target is up" "curl -s 'http://127.0.0.1:9090/api/v1/targets' | g
 check "metrics expose known charge" "curl -s 'http://127.0.0.1:8080/metrics' | grep -q 'p09_known_charge_nano_total'"
 
 note "Grafana ready"
-check "grafana health ok" "curl -s http://127.0.0.1:3000/api/health | grep -q '\"database\":\"ok\"'"
+for _ in $(seq 1 30); do curl -s http://127.0.0.1:3000/api/health | grep -q '"database": *"ok"' && break; sleep 2; done
+check "grafana health ok" "curl -s http://127.0.0.1:3000/api/health | grep -Eq '\"database\": *\"ok\"'"
 
 note "Alertmanager -> local sink delivery"
 STARTS="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -86,10 +87,17 @@ check "same run_id after recreate" "[ \"$DUP_RUN\" = \"$RUN_ID\" ]"
 
 note "missing secret fails readiness safely"
 $COMPOSE down >/dev/null
-P09_HMAC_SECRET= $COMPOSE up -d api >/dev/null 2>&1 || true
+# env_file values win over the shell, so write a temporary env file without
+# the HMAC secret instead of unsetting it in the shell.
+grep -v '^P09_HMAC_SECRET=' deploy/.env > deploy/.env.nohmac
+cp deploy/.env deploy/.env.bak
+cp deploy/.env.nohmac deploy/.env
+$COMPOSE up -d api >/dev/null 2>&1 || true
 sleep 6
 check "missing HMAC secret is not ready" "[ \"$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:${PORT}/health/ready || echo 000)\" = 503 ]"
 $COMPOSE down >/dev/null
+mv deploy/.env.bak deploy/.env
+rm -f deploy/.env.nohmac
 
 note "prior-image rollback"
 $COMPOSE up -d >/dev/null

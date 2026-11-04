@@ -16,8 +16,9 @@ RUN pip install --no-cache-dir --requirement /srv/requirements.txt
 
 COPY app /srv/app
 
-# Ledger volume mount point; owned by the non-root user.
-RUN mkdir -p /data && chown -R app:app /srv /data
+# Ledger and alert-sink receipt volume mount points; owned by the non-root
+# user so fresh named volumes inherit that ownership.
+RUN mkdir -p /data /receipts && chown -R app:app /srv /data /receipts
 
 USER 10001:10001
 EXPOSE 8080

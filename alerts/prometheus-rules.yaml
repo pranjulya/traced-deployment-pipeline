@@ -83,7 +83,7 @@ groups:
           dashboard: "dashboards/p09-overview.json"
 
       - alert: P09HeartbeatAbsent
-        expr: absent(up{job="p09-api"}[2m])
+        expr: absent_over_time(up{job="p09-api"}[2m])
         for: 2m
         labels:
           severity: critical

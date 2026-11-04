@@ -75,3 +75,25 @@ def test_sink_rejects_malformed_and_missing_paths():
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_main_binds_host_from_environment(monkeypatch):
+    seen = {}
+    module = load("notify_sink_main", "deploy/sink/notify_sink.py")
+
+    class FakeServer:
+        def serve_forever(self):
+            raise KeyboardInterrupt
+
+        def shutdown(self):
+            seen["shutdown"] = True
+
+    def fake_create_server(sink, host="127.0.0.1", port=9099):
+        seen["host"], seen["port"] = host, port
+        return FakeServer()
+
+    monkeypatch.setattr(module, "create_server", fake_create_server)
+    monkeypatch.setenv("P09_SINK_HOST", "0.0.0.0")
+    monkeypatch.delenv("P09_SINK_FILE", raising=False)
+    module.main(["notify_sink.py", "9099"])
+    assert seen == {"host": "0.0.0.0", "port": 9099, "shutdown": True}

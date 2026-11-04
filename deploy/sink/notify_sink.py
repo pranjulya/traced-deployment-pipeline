@@ -91,8 +91,12 @@ def create_server(sink, host="127.0.0.1", port=9099):
 def main(argv):
     port = int(argv[1]) if len(argv) > 1 else 9099
     sink = Sink(file_path=os.environ.get("P09_SINK_FILE"))
-    server = create_server(sink, port=port)
-    print(f"local sink listening on http://127.0.0.1:{port}/alerts")
+    # Inside Compose the sink must accept Alertmanager on the internal
+    # telemetry network, so the container sets P09_SINK_HOST=0.0.0.0. It is
+    # never published to the host.
+    host = os.environ.get("P09_SINK_HOST", "127.0.0.1")
+    server = create_server(sink, host=host, port=port)
+    print(f"local sink listening on http://{host}:{port}/alerts")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
