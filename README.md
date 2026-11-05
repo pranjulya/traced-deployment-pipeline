@@ -2,7 +2,7 @@
 
 A reproducible single-host reference deployment of a bounded, read-only agent API. It is instrumented so an operator can diagnose provider, tool, deployment and telemetry failures using correlated traces, operational metrics, durable usage accounting, dashboards and alerts. This is a production-minded learning deployment, not a high-availability service.
 
-> **Status:** Phases 00–01 are complete. Phases 02–04 are implemented and tested on the paths that don't need Docker, but their live verification is blocked until a Docker daemon is available. Phases 05–06 have not started. See [Implementation.md](Implementation.md) for the authoritative status.
+> **Status:** Phases 00–01 are complete. Phases 02–04 are implemented; the live rehearsal (`tests/integration/live_deploy_check.sh`) passed all 16 checks against a real Docker daemon on 2026-11-04, and the phases are awaiting gate review and recorded evidence before being marked complete. Phases 05–06 have not started. See [Implementation.md](Implementation.md) for the authoritative status.
 
 ## Features
 
@@ -34,7 +34,7 @@ pip install -r requirements-deploy-dev.txt
 pytest -q
 ```
 
-The live rehearsal (`tests/integration/live_deploy_check.sh`) requires a running Docker daemon.
+The live rehearsal (`tests/integration/live_deploy_check.sh`) requires a running Docker daemon and starts the full Compose stack.
 
 ## Run the API locally (without Docker)
 
